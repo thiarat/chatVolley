@@ -1,0 +1,49 @@
+# ─── API Keys & Secrets ───────────────────────────────────────────────────────
+backend/.env
+.env
+*.env
+
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Virtual Environment ──────────────────────────────────────────────────────
+env/
+venv/
+.venv/
+ENV/
+
+# ─── ChromaDB (vector store — สร้างใหม่ได้จาก PDF) ──────────────────────────
+backend/chroma_db/
+
+# ─── Evaluation results ───────────────────────────────────────────────────────
+backend/results/
+
+# ─── Node / Angular ───────────────────────────────────────────────────────────
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Logs & temp ─────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.zip
