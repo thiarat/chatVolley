@@ -122,8 +122,8 @@ import { Stats, HistoryItem } from '../../models/api.model';
                   <span *ngIf="item.confidence === null" class="na">—</span>
                 </td>
                 <td>
-                  <span class="fb-badge like" *ngIf="item.feedback === 'like'">👍</span>
-                  <span class="fb-badge dislike" *ngIf="item.feedback === 'dislike'">👎</span>
+                  <span class="fb-badge like" *ngIf="item.feedback === 'like'">👍 ถูกใจ</span>
+                  <span class="fb-badge dislike" *ngIf="item.feedback === 'dislike'">👎 ไม่ถูกใจ</span>
                   <span class="na" *ngIf="!item.feedback">—</span>
                 </td>
                 <td class="ts-cell">{{ item.timestamp | slice:0:16 }}</td>
@@ -340,7 +340,18 @@ import { Stats, HistoryItem } from '../../models/api.model';
     .mini-fill.low { background: #EF4444; }
     .mini-bar span { font-size: 11px; color: #64748B; }
 
-    .fb-badge { font-size: 15px; }
+    .fb-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 3px 9px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+    .fb-badge.like    { background: #DCFCE7; color: #15803D; }
+    .fb-badge.dislike { background: #FEE2E2; color: #DC2626; }
 
     .detail-row td { background: #F8FAFC; padding: 0; }
     .detail-content {

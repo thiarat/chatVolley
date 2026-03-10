@@ -18,6 +18,7 @@ export interface ChatMessage {
   warning?: string | null;
   timestamp: Date;
   loading?: boolean;
+  feedback?: 'like' | 'dislike' | null;
 }
 
 export interface FeedbackRequest {
@@ -48,4 +49,29 @@ export interface Stats {
 export interface DocumentStatus {
   has_documents: boolean;
   chunk_count: number;
+}
+
+export interface ChatSession {
+  session_id: string;
+  title: string;
+  created_at: string;
+  last_message_at: string;
+  message_count: number;
+}
+
+export interface SessionMessage {
+  id: number;
+  question: string;
+  answer: string;
+  source_chunk: string | null;
+  confidence: number | null;
+  response_time_ms: number;
+  timestamp: string;
+  feedback: 'like' | 'dislike' | null;
+}
+
+export interface SessionGroup {
+  today: ChatSession[];
+  yesterday: ChatSession[];
+  older: ChatSession[];
 }

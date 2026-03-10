@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { AskResponse, FeedbackRequest, HistoryItem, Stats, DocumentStatus } from '../models/api.model';
+import { AskResponse, FeedbackRequest, HistoryItem, Stats, DocumentStatus, ChatSession, SessionMessage } from '../models/api.model';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -9,8 +9,8 @@ export class ApiService {
 
   constructor(private http: HttpClient) {}
 
-  ask(question: string): Observable<AskResponse> {
-    return this.http.post<AskResponse>(`${this.base}/ask`, { question });
+  ask(question: string, sessionId: string): Observable<AskResponse> {
+    return this.http.post<AskResponse>(`${this.base}/ask`, { question, session_id: sessionId });
   }
 
   sendFeedback(qa_id: number, rating: 'like' | 'dislike'): Observable<any> {
@@ -20,6 +20,20 @@ export class ApiService {
   getHistory(limit = 100): Observable<{ data: HistoryItem[]; total: number }> {
     return this.http.get<{ data: HistoryItem[]; total: number }>(`${this.base}/history?limit=${limit}`);
   }
+
+  // ── Session endpoints ────────────────────────────────────────────────────
+  getSessions(limit = 60): Observable<{ sessions: ChatSession[] }> {
+    return this.http.get<{ sessions: ChatSession[] }>(`${this.base}/sessions?limit=${limit}`);
+  }
+
+  getSessionMessages(sessionId: string): Observable<{ session_id: string; messages: SessionMessage[] }> {
+    return this.http.get<{ session_id: string; messages: SessionMessage[] }>(`${this.base}/sessions/${sessionId}`);
+  }
+
+  deleteSession(sessionId: string): Observable<any> {
+    return this.http.delete(`${this.base}/sessions/${sessionId}`);
+  }
+  // ────────────────────────────────────────────────────────────────────────
 
   getStats(): Observable<Stats> {
     return this.http.get<Stats>(`${this.base}/stats`);

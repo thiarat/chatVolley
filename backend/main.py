@@ -46,8 +46,13 @@ def init_db():
             source_chunk TEXT,
             confidence REAL,
             response_time_ms INTEGER,
-            timestamp TIMESTAMPTZ DEFAULT NOW()
+            timestamp TIMESTAMPTZ DEFAULT NOW(),
+            session_id VARCHAR(36)
         )
+    """)
+    # Add session_id column for existing tables that don't have it yet
+    cur.execute("""
+        ALTER TABLE qa_log ADD COLUMN IF NOT EXISTS session_id VARCHAR(36)
     """)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS feedback (
@@ -55,6 +60,13 @@ def init_db():
             qa_id INTEGER NOT NULL REFERENCES qa_log(id),
             rating TEXT NOT NULL CHECK(rating IN ('like', 'dislike')),
             timestamp TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    # Table for soft-deleted sessions (ซ่อนจาก sidebar แต่ข้อมูลยังอยู่ใน DB)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS hidden_sessions (
+            session_id VARCHAR(36) PRIMARY KEY,
+            hidden_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
     conn.commit()
@@ -81,6 +93,7 @@ auto_load_pdf()
 # --- Models ---
 class AskRequest(BaseModel):
     question: str
+    session_id: Optional[str] = None   # UUID สร้างจาก frontend
 
 class AskResponse(BaseModel):
     id: int
@@ -133,8 +146,9 @@ def ask_question(body: AskRequest):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO qa_log (question, answer, source_chunk, confidence, response_time_ms) VALUES (%s,%s,%s,%s,%s) RETURNING id",
-        (body.question, answer, source_chunk, confidence, elapsed_ms)
+        "INSERT INTO qa_log (question, answer, source_chunk, confidence, response_time_ms, session_id) "
+        "VALUES (%s,%s,%s,%s,%s,%s) RETURNING id",
+        (body.question, answer, source_chunk, confidence, elapsed_ms, body.session_id)
     )
     qa_id = cur.fetchone()[0]
     conn.commit()
@@ -169,7 +183,7 @@ def get_history(limit: int = 100):
         SELECT q.id, q.question, q.answer, q.source_chunk,
                q.confidence, q.response_time_ms,
                to_char(q.timestamp, 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
-               f.rating
+               f.rating AS feedback
         FROM qa_log q
         LEFT JOIN feedback f ON f.qa_id = q.id
         ORDER BY q.timestamp DESC
@@ -205,6 +219,83 @@ def reindex_documents():
     if not success:
         raise HTTPException(422, "ไม่สามารถอัปโหลด PDF ไปยัง ChatPDF ได้")
     return {"success": True, "source_id": rag._source_id}
+
+@app.get("/sessions")
+def get_sessions(limit: int = 60):
+    """
+    คืนรายการ sessions จัดกลุ่มจาก session_id
+    - ข้อความที่มี session_id → รวมเป็น 1 session
+    - ข้อความเก่าที่ไม่มี session_id → แต่ละแถวเป็น session ตัวเอง (solo_<id>)
+    - sessions ที่ถูกซ่อน (hidden_sessions) จะไม่แสดง
+    """
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    cur.execute("""
+        SELECT
+            COALESCE(session_id, 'solo_' || id::text)   AS session_id,
+            MIN(question)                                 AS title,
+            to_char(MIN(timestamp), 'YYYY-MM-DD HH24:MI:SS') AS created_at,
+            to_char(MAX(timestamp), 'YYYY-MM-DD HH24:MI:SS') AS last_message_at,
+            COUNT(*)                                      AS message_count
+        FROM qa_log
+        WHERE COALESCE(session_id, 'solo_' || id::text) NOT IN (
+            SELECT session_id FROM hidden_sessions
+        )
+        GROUP BY COALESCE(session_id, 'solo_' || id::text)
+        ORDER BY MAX(timestamp) DESC
+        LIMIT %s
+    """, (limit,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {"sessions": [dict(r) for r in rows]}
+
+@app.get("/sessions/{session_id}")
+def get_session_messages(session_id: str):
+    """คืนข้อความทั้งหมดใน session นั้น"""
+    conn = get_conn()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    if session_id.startswith("solo_"):
+        qa_id = int(session_id.replace("solo_", ""))
+        cur.execute("""
+            SELECT q.id, q.question, q.answer, q.source_chunk,
+                   q.confidence, q.response_time_ms,
+                   to_char(q.timestamp, 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
+                   f.rating AS feedback
+            FROM qa_log q
+            LEFT JOIN feedback f ON f.qa_id = q.id
+            WHERE q.id = %s
+            ORDER BY q.timestamp ASC
+        """, (qa_id,))
+    else:
+        cur.execute("""
+            SELECT q.id, q.question, q.answer, q.source_chunk,
+                   q.confidence, q.response_time_ms,
+                   to_char(q.timestamp, 'YYYY-MM-DD HH24:MI:SS') AS timestamp,
+                   f.rating AS feedback
+            FROM qa_log q
+            LEFT JOIN feedback f ON f.qa_id = q.id
+            WHERE q.session_id = %s
+            ORDER BY q.timestamp ASC
+        """, (session_id,))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return {"session_id": session_id, "messages": [dict(r) for r in rows]}
+
+@app.delete("/sessions/{session_id}")
+def delete_session(session_id: str):
+    """ซ่อน session จาก sidebar (ไม่ลบข้อมูลจาก DB)"""
+    conn = get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO hidden_sessions (session_id) VALUES (%s) ON CONFLICT DO NOTHING",
+        (session_id,)
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"success": True, "message": f"ซ่อน session '{session_id}' แล้ว"}
 
 @app.get("/stats")
 def get_stats():

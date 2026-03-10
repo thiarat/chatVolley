@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
-import { ChatMessage, HistoryItem } from '../../models/api.model';
+import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
 
 @Component({
   selector: 'app-chat-page',
@@ -43,36 +43,66 @@ import { ChatMessage, HistoryItem } from '../../models/api.model';
       </button>
 
       <nav class="history-nav" *ngIf="!sidebarCollapsed">
-        <p class="history-label">ประวัติคำถาม</p>
+        <p class="history-label">ประวัติแชท</p>
         <div class="loading-skeleton" *ngIf="historyLoading">
           <div class="skeleton-line" *ngFor="let i of [1,2,3,4]"></div>
         </div>
-        <div class="history-empty" *ngIf="!historyLoading && historyGroups.today.length === 0 && historyGroups.yesterday.length === 0 && historyGroups.older.length === 0">
+        <div class="history-empty" *ngIf="!historyLoading && sessionGroups.today.length === 0 && sessionGroups.yesterday.length === 0 && sessionGroups.older.length === 0">
           <p>ยังไม่มีประวัติ</p>
         </div>
-        <div *ngIf="historyGroups.today.length > 0">
+
+        <!-- วันนี้ -->
+        <div *ngIf="sessionGroups.today.length > 0">
           <p class="group-label">วันนี้</p>
-          <button class="history-item" *ngFor="let item of historyGroups.today"
-            (click)="loadHistoryItem(item)" [class.active]="selectedHistoryId === item.id">
-            <span class="history-icon">🏐</span>
-            <span class="history-text">{{ item.question | slice:0:35 }}{{ item.question.length > 35 ? '…' : '' }}</span>
-          </button>
+          <div class="session-wrap" *ngFor="let s of sessionGroups.today">
+            <button class="history-item" (click)="loadSession(s)"
+              [class.active]="activeSessionId === s.session_id">
+              <span class="history-icon">💬</span>
+              <span class="history-text">{{ s.title | slice:0:32 }}{{ s.title.length > 32 ? '…' : '' }}</span>
+              <span class="msg-badge" *ngIf="s.message_count > 1">{{ s.message_count }}</span>
+            </button>
+            <button class="delete-session-btn" (click)="deleteSession(s, $event)" title="ลบแชทนี้">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M9 3L3 9M3 3L9 9" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div *ngIf="historyGroups.yesterday.length > 0">
+
+        <!-- เมื่อวาน -->
+        <div *ngIf="sessionGroups.yesterday.length > 0">
           <p class="group-label">เมื่อวาน</p>
-          <button class="history-item" *ngFor="let item of historyGroups.yesterday"
-            (click)="loadHistoryItem(item)" [class.active]="selectedHistoryId === item.id">
-            <span class="history-icon">🏐</span>
-            <span class="history-text">{{ item.question | slice:0:35 }}{{ item.question.length > 35 ? '…' : '' }}</span>
-          </button>
+          <div class="session-wrap" *ngFor="let s of sessionGroups.yesterday">
+            <button class="history-item" (click)="loadSession(s)"
+              [class.active]="activeSessionId === s.session_id">
+              <span class="history-icon">💬</span>
+              <span class="history-text">{{ s.title | slice:0:32 }}{{ s.title.length > 32 ? '…' : '' }}</span>
+              <span class="msg-badge" *ngIf="s.message_count > 1">{{ s.message_count }}</span>
+            </button>
+            <button class="delete-session-btn" (click)="deleteSession(s, $event)" title="ลบแชทนี้">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M9 3L3 9M3 3L9 9" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div *ngIf="historyGroups.older.length > 0">
+
+        <!-- ก่อนหน้า -->
+        <div *ngIf="sessionGroups.older.length > 0">
           <p class="group-label">ก่อนหน้า</p>
-          <button class="history-item" *ngFor="let item of historyGroups.older"
-            (click)="loadHistoryItem(item)" [class.active]="selectedHistoryId === item.id">
-            <span class="history-icon">🏐</span>
-            <span class="history-text">{{ item.question | slice:0:35 }}{{ item.question.length > 35 ? '…' : '' }}</span>
-          </button>
+          <div class="session-wrap" *ngFor="let s of sessionGroups.older">
+            <button class="history-item" (click)="loadSession(s)"
+              [class.active]="activeSessionId === s.session_id">
+              <span class="history-icon">💬</span>
+              <span class="history-text">{{ s.title | slice:0:32 }}{{ s.title.length > 32 ? '…' : '' }}</span>
+              <span class="msg-badge" *ngIf="s.message_count > 1">{{ s.message_count }}</span>
+            </button>
+            <button class="delete-session-btn" (click)="deleteSession(s, $event)" title="ลบแชทนี้">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M9 3L3 9M3 3L9 9" stroke="#94A3B8" stroke-width="1.5" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -144,12 +174,18 @@ import { ChatMessage, HistoryItem } from '../../models/api.model';
                   </span>
                   <span class="meta-time">{{ msg.response_time_ms }}ms</span>
                   <div class="feedback-btns">
-                    <button class="fb-btn like" (click)="sendFeedback(msg, 'like')" title="ถูกต้อง">
+                    <button class="fb-btn like"
+                      [class.active]="msg.feedback === 'like'"
+                      (click)="sendFeedback(msg, 'like')"
+                      title="ถูกต้อง">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M4 6V12M1 7H4L6 2C6.5 2 8 2.5 8 4V6H11.5C12 6 12.5 6.5 12.5 7L11.5 11.5C11.3 12 11 12 10.5 12H4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                       </svg>
                     </button>
-                    <button class="fb-btn dislike" (click)="sendFeedback(msg, 'dislike')" title="ไม่ถูกต้อง">
+                    <button class="fb-btn dislike"
+                      [class.active]="msg.feedback === 'dislike'"
+                      (click)="sendFeedback(msg, 'dislike')"
+                      title="ไม่ถูกต้อง">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M10 8V2M13 7H10L8 12C7.5 12 6 11.5 6 10V8H2.5C2 8 1.5 7.5 1.5 7L2.5 2.5C2.7 2 3 2 3.5 2H10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                       </svg>
@@ -283,12 +319,51 @@ import { ChatMessage, HistoryItem } from '../../models/api.model';
       padding: 8px 6px 4px;
       margin: 0;
     }
+    /* ── Session item ── */
+    .session-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .session-wrap:hover .delete-session-btn { opacity: 1; }
+
+    .delete-session-btn {
+      position: absolute;
+      right: 4px;
+      opacity: 0;
+      padding: 4px 5px;
+      background: none;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: opacity 0.15s, background 0.12s;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+    .delete-session-btn:hover { background: #FEE2E2; }
+    .delete-session-btn:hover svg path { stroke: #EF4444; }
+
+    .msg-badge {
+      font-size: 10px;
+      background: #E2E8F0;
+      color: #64748B;
+      padding: 1px 6px;
+      border-radius: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+      line-height: 1.6;
+    }
+
     .history-item {
-      width: 100%;
+      flex: 1;
+      min-width: 0;
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 7px 8px;
+      padding-right: 28px;
       background: none;
       border: none;
       border-radius: 7px;
@@ -300,7 +375,7 @@ import { ChatMessage, HistoryItem } from '../../models/api.model';
     .history-item:hover { background: #F1F5F9; }
     .history-item.active { background: #EFF6FF; }
     .history-icon { font-size: 12px; flex-shrink: 0; }
-    .history-text { font-size: 12.5px; color: #374151; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .history-text { font-size: 12.5px; color: #374151; line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
     .history-empty p { font-size: 12px; color: #94A3B8; text-align: center; padding: 16px 0; margin: 0; }
     .loading-skeleton { padding: 4px 0; }
     .skeleton-line {
@@ -504,6 +579,8 @@ import { ChatMessage, HistoryItem } from '../../models/api.model';
     }
     .fb-btn.like:hover { background: #F0FDF4; color: #16A34A; border-color: #86EFAC; }
     .fb-btn.dislike:hover { background: #FEF2F2; color: #DC2626; border-color: #FCA5A5; }
+    .fb-btn.like.active { background: #DCFCE7; color: #16A34A; border-color: #4ADE80; }
+    .fb-btn.dislike.active { background: #FEE2E2; color: #DC2626; border-color: #F87171; }
 
     .source-details {
       margin-top: 8px;
@@ -618,11 +695,12 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
   docReady = false;
   sidebarCollapsed = false;
   historyLoading = false;
-  selectedHistoryId: number | null = null;
 
-  historyGroups: { today: HistoryItem[]; yesterday: HistoryItem[]; older: HistoryItem[] } = {
-    today: [], yesterday: [], older: []
-  };
+  // Session management
+  currentSessionId: string = this.generateSessionId();
+  activeSessionId: string | null = null;   // session ที่เลือกใน sidebar
+
+  sessionGroups: SessionGroup = { today: [], yesterday: [], older: [] };
 
   suggestions = [
     'ลูกเสิร์ฟต้องทำอย่างไร?',
@@ -648,9 +726,16 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
     }
   }
 
+  private generateSessionId(): string {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
+
   loadHistory() {
     this.historyLoading = true;
-    this.api.getHistory(50).subscribe({
+    this.api.getSessions(60).subscribe({
       next: res => {
         const now = new Date();
         const todayStr = now.toDateString();
@@ -658,12 +743,12 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = yesterday.toDateString();
 
-        this.historyGroups = { today: [], yesterday: [], older: [] };
-        res.data.forEach(item => {
-          const d = new Date(item.timestamp).toDateString();
-          if (d === todayStr) this.historyGroups.today.push(item);
-          else if (d === yesterdayStr) this.historyGroups.yesterday.push(item);
-          else this.historyGroups.older.push(item);
+        this.sessionGroups = { today: [], yesterday: [], older: [] };
+        res.sessions.forEach(s => {
+          const d = new Date(s.last_message_at).toDateString();
+          if (d === todayStr)           this.sessionGroups.today.push(s);
+          else if (d === yesterdayStr)  this.sessionGroups.yesterday.push(s);
+          else                          this.sessionGroups.older.push(s);
         });
         this.historyLoading = false;
       },
@@ -671,26 +756,47 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
     });
   }
 
-  loadHistoryItem(item: HistoryItem) {
-    this.selectedHistoryId = item.id;
-    this.messages = [
-      { role: 'user', content: item.question, timestamp: new Date(item.timestamp) },
-      {
-        role: 'assistant',
-        content: item.answer,
-        id: item.id,
-        confidence: item.confidence,
-        source_chunk: item.source_chunk,
-        response_time_ms: item.response_time_ms,
-        timestamp: new Date(item.timestamp)
+  loadSession(session: ChatSession) {
+    this.activeSessionId = session.session_id;
+    this.messages = [];
+    this.api.getSessionMessages(session.session_id).subscribe({
+      next: res => {
+        const msgs: ChatMessage[] = [];
+        res.messages.forEach(m => {
+          msgs.push({ role: 'user',      content: m.question, timestamp: new Date(m.timestamp) });
+          msgs.push({ role: 'assistant', content: m.answer,   timestamp: new Date(m.timestamp),
+            id: m.id, confidence: m.confidence, source_chunk: m.source_chunk,
+            response_time_ms: m.response_time_ms, feedback: m.feedback });
+        });
+        this.messages = msgs;
+        this.shouldScroll = true;
       }
-    ];
-    this.shouldScroll = true;
+    });
+  }
+
+  deleteSession(session: ChatSession, event: Event) {
+    event.stopPropagation();   // ไม่ให้ trigger loadSession
+    this.api.deleteSession(session.session_id).subscribe({
+      next: () => {
+        // ถ้าลบ session ที่กำลังดูอยู่ → ล้างหน้าจอ
+        if (this.activeSessionId === session.session_id) {
+          this.messages = [];
+          this.activeSessionId = null;
+        }
+        // ถ้าเป็น session ปัจจุบัน (กำลังคุยอยู่) → สร้าง session ใหม่
+        if (this.currentSessionId === session.session_id) {
+          this.currentSessionId = this.generateSessionId();
+        }
+        // อัปเดต sidebar
+        this.loadHistory();
+      }
+    });
   }
 
   newChat() {
     this.messages = [];
-    this.selectedHistoryId = null;
+    this.activeSessionId = null;
+    this.currentSessionId = this.generateSessionId();
     this.question = '';
   }
 
@@ -724,7 +830,7 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
     this.shouldScroll = true;
 
     this.isLoading = true;
-    this.api.ask(q).subscribe({
+    this.api.ask(q, this.currentSessionId).subscribe({
       next: res => {
         const idx = this.messages.indexOf(loadingMsg);
         if (idx !== -1) {
@@ -742,6 +848,8 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
         }
         this.isLoading = false;
         this.shouldScroll = true;
+        // ไฮไลต์ session ปัจจุบันใน sidebar
+        this.activeSessionId = this.currentSessionId;
         this.loadHistory();
       },
       error: () => {
@@ -761,7 +869,8 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
   }
 
   sendFeedback(msg: ChatMessage, rating: 'like' | 'dislike') {
-    if (msg.id) {
+    if (msg.id && msg.feedback !== rating) {
+      msg.feedback = rating;   // update UI ทันที — ปุ่มเปลี่ยนสีค้าง
       this.api.sendFeedback(msg.id, rating).subscribe();
     }
   }
