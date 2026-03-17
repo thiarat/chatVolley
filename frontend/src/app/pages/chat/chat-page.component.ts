@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-chat-page',
@@ -126,6 +127,16 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
           <span class="sport-badge">🏐</span>
           <span>กติกาวอลเลย์บอล AI</span>
         </div>
+
+        <!-- ปุ่ม ดูเอกสาร (เปิด PDF ใน Tab ใหม่) -->
+        <a class="view-doc-btn" [attr.href]="pdfUrl" target="_blank" *ngIf="docReady" title="ดูเอกสารกติกา">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="8" cy="8" r="2" fill="currentColor"/>
+          </svg>
+          ดูเอกสาร
+        </a>
+
         <div class="topbar-status" [class.ready]="docReady" [class.notready]="!docReady">
           <span class="status-dot"></span>
           {{ docReady ? 'พร้อมใช้งาน' : 'ยังไม่มีเอกสาร' }}
@@ -163,9 +174,16 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
               <!-- Content -->
               <div *ngIf="!msg.loading">
                 <p class="msg-text">{{ msg.content }}</p>
-                <!-- Warning -->
+                <!-- Warning + ปุ่ม ดูเอกสาร -->
                 <div class="msg-warning" *ngIf="msg.warning">
-                  {{ msg.warning }}
+                  <span>{{ msg.warning }}</span>
+                  <a class="warning-doc-btn" [attr.href]="pdfUrl" target="_blank">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+                      <ellipse cx="8" cy="8" rx="7" ry="4.5" stroke="currentColor" stroke-width="1.5"/>
+                      <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                    </svg>
+                    ดูเอกสาร
+                  </a>
                 </div>
                 <!-- Meta -->
                 <div class="msg-meta" *ngIf="msg.role === 'assistant' && msg.id">
@@ -176,16 +194,14 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
                   <div class="feedback-btns">
                     <button class="fb-btn like"
                       [class.active]="msg.feedback === 'like'"
-                      (click)="sendFeedback(msg, 'like')"
-                      title="ถูกต้อง">
+                      (click)="sendFeedback(msg, 'like')" title="ถูกต้อง">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M4 6V12M1 7H4L6 2C6.5 2 8 2.5 8 4V6H11.5C12 6 12.5 6.5 12.5 7L11.5 11.5C11.3 12 11 12 10.5 12H4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                       </svg>
                     </button>
                     <button class="fb-btn dislike"
                       [class.active]="msg.feedback === 'dislike'"
-                      (click)="sendFeedback(msg, 'dislike')"
-                      title="ไม่ถูกต้อง">
+                      (click)="sendFeedback(msg, 'dislike')" title="ไม่ถูกต้อง">
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M10 8V2M13 7H10L8 12C7.5 12 6 11.5 6 10V8H2.5C2 8 1.5 7.5 1.5 7L2.5 2.5C2.7 2 3 2 3.5 2H10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                       </svg>
@@ -229,6 +245,7 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       </div>
     </main>
   </div>
+
   `,
   styles: [`
     :host { display: block; height: 100vh; }
@@ -319,7 +336,6 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       padding: 8px 6px 4px;
       margin: 0;
     }
-    /* ── Session item ── */
     .session-wrap {
       position: relative;
       display: flex;
@@ -416,11 +432,12 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 24px;
+      padding: 0 20px;
       height: 56px;
       background: #fff;
       border-bottom: 1px solid #E2E8F0;
       flex-shrink: 0;
+      gap: 10px;
     }
     .topbar-title {
       display: flex;
@@ -429,8 +446,30 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       font-size: 15px;
       font-weight: 600;
       color: #1E293B;
+      flex: 1;
     }
     .sport-badge { font-size: 18px; }
+
+    /* ── ปุ่ม ดูเอกสาร ── */
+    .view-doc-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 13px;
+      background: #EFF6FF;
+      border: 1px solid #BFDBFE;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #2563EB;
+      cursor: pointer;
+      font-family: inherit;
+      text-decoration: none;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+    .view-doc-btn:hover { background: #DBEAFE; border-color: #93C5FD; color: #1D4ED8; }
+
     .topbar-status {
       display: flex;
       align-items: center;
@@ -439,6 +478,7 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       padding: 4px 10px;
       border-radius: 20px;
       font-weight: 500;
+      white-space: nowrap;
     }
     .topbar-status.ready { background: #F0FDF4; color: #15803D; }
     .topbar-status.notready { background: #FEF9C3; color: #92400E; }
@@ -542,15 +582,40 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
     }
 
     .msg-text { margin: 0; font-size: 14px; white-space: pre-wrap; }
+
+    /* ── Warning box + ปุ่มดูเอกสาร ── */
     .msg-warning {
       margin-top: 8px;
-      padding: 6px 10px;
+      padding: 7px 10px;
       background: #FEF9C3;
       border: 1px solid #FDE047;
       border-radius: 6px;
       font-size: 12px;
       color: #92400E;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
     }
+    .warning-doc-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      background: #FFF;
+      border: 1px solid #FCD34D;
+      border-radius: 6px;
+      font-size: 11.5px;
+      color: #92400E;
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+      text-decoration: none;
+      transition: background 0.12s;
+      white-space: nowrap;
+    }
+    .warning-doc-btn:hover { background: #FEF3C7; color: #78350F; }
+
     .msg-meta {
       display: flex;
       align-items: center;
@@ -577,9 +642,9 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       color: #94A3B8;
       transition: all 0.15s;
     }
-    .fb-btn.like:hover { background: #F0FDF4; color: #16A34A; border-color: #86EFAC; }
+    .fb-btn.like:hover  { background: #F0FDF4; color: #16A34A; border-color: #86EFAC; }
     .fb-btn.dislike:hover { background: #FEF2F2; color: #DC2626; border-color: #FCA5A5; }
-    .fb-btn.like.active { background: #DCFCE7; color: #16A34A; border-color: #4ADE80; }
+    .fb-btn.like.active    { background: #DCFCE7; color: #16A34A; border-color: #4ADE80; }
     .fb-btn.dislike.active { background: #FEE2E2; color: #DC2626; border-color: #F87171; }
 
     .source-details {
@@ -683,11 +748,14 @@ import { ChatMessage, ChatSession, SessionGroup } from '../../models/api.model';
       text-align: center;
       margin: 6px 0 0;
     }
+
   `]
 })
 export class ChatPageComponent implements OnInit, AfterViewChecked {
   @ViewChild('messagesContainer') messagesContainer!: ElementRef;
   @ViewChild('inputArea') inputArea!: ElementRef;
+
+  readonly pdfUrl = `${environment.apiUrl}/pdf`;
 
   question = '';
   messages: ChatMessage[] = [];
@@ -698,7 +766,7 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
 
   // Session management
   currentSessionId: string = this.generateSessionId();
-  activeSessionId: string | null = null;   // session ที่เลือกใน sidebar
+  activeSessionId: string | null = null;
 
   sessionGroups: SessionGroup = { today: [], yesterday: [], older: [] };
 
@@ -775,19 +843,16 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
   }
 
   deleteSession(session: ChatSession, event: Event) {
-    event.stopPropagation();   // ไม่ให้ trigger loadSession
+    event.stopPropagation();
     this.api.deleteSession(session.session_id).subscribe({
       next: () => {
-        // ถ้าลบ session ที่กำลังดูอยู่ → ล้างหน้าจอ
         if (this.activeSessionId === session.session_id) {
           this.messages = [];
           this.activeSessionId = null;
         }
-        // ถ้าเป็น session ปัจจุบัน (กำลังคุยอยู่) → สร้าง session ใหม่
         if (this.currentSessionId === session.session_id) {
           this.currentSessionId = this.generateSessionId();
         }
-        // อัปเดต sidebar
         this.loadHistory();
       }
     });
@@ -848,7 +913,6 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
         }
         this.isLoading = false;
         this.shouldScroll = true;
-        // ไฮไลต์ session ปัจจุบันใน sidebar
         this.activeSessionId = this.currentSessionId;
         this.loadHistory();
       },
@@ -870,7 +934,7 @@ export class ChatPageComponent implements OnInit, AfterViewChecked {
 
   sendFeedback(msg: ChatMessage, rating: 'like' | 'dislike') {
     if (msg.id && msg.feedback !== rating) {
-      msg.feedback = rating;   // update UI ทันที — ปุ่มเปลี่ยนสีค้าง
+      msg.feedback = rating;
       this.api.sendFeedback(msg.id, rating).subscribe();
     }
   }

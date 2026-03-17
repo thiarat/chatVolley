@@ -105,7 +105,7 @@ import { Stats, HistoryItem } from '../../models/api.model';
                 <td class="q-cell">{{ item.question | slice:0:60 }}{{ item.question.length > 60 ? '…' : '' }}</td>
                 <td class="a-cell">{{ item.answer | slice:0:80 }}{{ item.answer.length > 80 ? '…' : '' }}</td>
                 <td>
-                  <span class="time-badge" [class.fast]="item.response_time_ms < 1000" [class.slow]="item.response_time_ms >= 2000">
+                  <span class="time-badge" [class.fast]="item.response_time_ms < 5000" [class.slow]="item.response_time_ms >= 10000">
                     {{ item.response_time_ms }}ms
                   </span>
                 </td>
@@ -122,8 +122,8 @@ import { Stats, HistoryItem } from '../../models/api.model';
                   <span *ngIf="item.confidence === null" class="na">—</span>
                 </td>
                 <td>
-                  <span class="fb-badge like" *ngIf="item.feedback === 'like'">👍 ถูกใจ</span>
-                  <span class="fb-badge dislike" *ngIf="item.feedback === 'dislike'">👎 ไม่ถูกใจ</span>
+                  <span class="fb-badge like" *ngIf="item.feedback === 'like'">👍 เห็นด้วย</span>
+                  <span class="fb-badge dislike" *ngIf="item.feedback === 'dislike'">👎 ไม่เห็นด้วย</span>
                   <span class="na" *ngIf="!item.feedback">—</span>
                 </td>
                 <td class="ts-cell">{{ item.timestamp | slice:0:16 }}</td>
@@ -328,7 +328,7 @@ import { Stats, HistoryItem } from '../../models/api.model';
     }
     .time-badge.fast { background: #F0FDF4; color: #15803D; }
     .time-badge.slow { background: #FEF2F2; color: #DC2626; }
-    .time-badge:not(.fast):not(.slow) { background: #F1F5F9; color: #64748B; }
+    .time-badge:not(.fast):not(.slow) { background: #F1F5F9; color: #568dd8ff; }
 
     .mini-bar { display: flex; align-items: center; gap: 6px; }
     .mini-fill {

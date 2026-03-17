@@ -37,6 +37,11 @@ frontend/.angular/
 Thumbs.db
 desktop.ini
 
+# ─── Vercel ───────────────────────────────────────────────────────────────────
+.vercel/
+backend/.vercel/
+frontend/.vercel/
+
 # ─── IDE ──────────────────────────────────────────────────────────────────────
 .vscode/
 .idea/

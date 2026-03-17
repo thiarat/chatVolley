@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -12,6 +13,8 @@ from dotenv import load_dotenv
 from chatpdf_pipeline import ChatPDFPipeline
 
 load_dotenv()
+
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 app = FastAPI(title="Volleyball Rules RAG API", version="2.0.0")
 
@@ -27,6 +30,9 @@ rag = ChatPDFPipeline()
 
 # --- DB Connection ---
 def get_conn():
+    db_url = os.getenv("DATABASE_URL")
+    if db_url:
+        return psycopg2.connect(db_url, sslmode="require")
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
@@ -78,7 +84,7 @@ def auto_load_pdf():
     if rag.get_document_count() > 0:
         print(f"ℹ️  ChatPDF source_id มีอยู่แล้ว — ข้ามการอัปโหลด")
         return
-    candidates = ["./volleyball_rules.pdf"]
+    candidates = [os.path.join(_BASE_DIR, "volleyball_rules.pdf")]
     pdf_path = next((p for p in candidates if os.path.exists(p)), None)
     if pdf_path is None:
         print("⚠️  ไม่พบไฟล์ PDF — ข้ามการโหลดอัตโนมัติ")
@@ -140,7 +146,7 @@ def ask_question(body: AskRequest):
     source_chunk = result.get("source_chunk")
     confidence = result.get("confidence")
     warning = None
-    if confidence is not None and confidence < 0.5:
+    if confidence is not None and 0.0 < confidence < 0.5:
         warning = "⚠️ AI ไม่แน่ใจในคำตอบนี้ กรุณาตรวจสอบกติกาต้นฉบับด้วย"
 
     conn = get_conn()
@@ -209,10 +215,22 @@ def document_status():
     count = rag.get_document_count()
     return {"has_documents": count > 0, "chunk_count": count}
 
+@app.get("/pdf")
+def get_pdf():
+    """ส่งไฟล์ volleyball_rules.pdf ให้ frontend แสดงใน modal"""
+    pdf_path = os.path.join(_BASE_DIR, "volleyball_rules.pdf")
+    if not os.path.exists(pdf_path):
+        raise HTTPException(404, "ไม่พบไฟล์ volleyball_rules.pdf")
+    return FileResponse(
+        pdf_path,
+        media_type="application/pdf",
+        headers={"Content-Disposition": "inline; filename=volleyball_rules.pdf"},
+    )
+
 @app.post("/reindex")
 def reindex_documents():
     """Re-upload volleyball_rules.pdf ไปยัง ChatPDF (ได้ sourceId ใหม่)"""
-    pdf_path = "./volleyball_rules.pdf"
+    pdf_path = os.path.join(_BASE_DIR, "volleyball_rules.pdf")
     if not os.path.exists(pdf_path):
         raise HTTPException(404, "ไม่พบไฟล์ volleyball_rules.pdf")
     success = rag.load_from_file(pdf_path)
