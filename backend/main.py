@@ -21,7 +21,7 @@ app = FastAPI(title="Volleyball Rules RAG API", version="2.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -32,7 +32,11 @@ rag = ChatPDFPipeline()
 def get_conn():
     db_url = os.getenv("DATABASE_URL")
     if db_url:
-        return psycopg2.connect(db_url, sslmode="require")
+        # Ensure sslmode=require is in the URL (Supabase needs it)
+        if "sslmode" not in db_url:
+            sep = "&" if "?" in db_url else "?"
+            db_url = f"{db_url}{sep}sslmode=require"
+        return psycopg2.connect(db_url)
     return psycopg2.connect(
         host=os.getenv("DB_HOST", "localhost"),
         port=os.getenv("DB_PORT", "5432"),
@@ -93,8 +97,15 @@ def auto_load_pdf():
     if not success:
         print("❌ อัปโหลด PDF ไปยัง ChatPDF ไม่สำเร็จ")
 
-init_db()
-auto_load_pdf()
+try:
+    init_db()
+except Exception as _e:
+    print(f"⚠️  init_db failed (will retry on first request): {_e}")
+
+try:
+    auto_load_pdf()
+except Exception as _e:
+    print(f"⚠️  auto_load_pdf failed: {_e}")
 
 # --- Models ---
 class AskRequest(BaseModel):
